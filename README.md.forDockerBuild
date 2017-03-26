@@ -4,10 +4,117 @@ $ docker-compose build shell > build-shell.txt
 
 $ docker run -it mydockerizedapp_shell bash
 
-$ docker-compose run web rails new . --force --database=postgresql --skip-bundle
+#$ docker-compose run web rails new . --force --database=postgresql --skip-bundle
+$ docker-compose run web rails new . -O
+======================
+*) Delete Only stopped containers:
+docker rm $(docker ps --filter "status=exited" -aq)
+
+*) Delete every Docker containers
+# Must be run first because images are attached to containers
+docker rm -f $(docker ps -a -q)
+
+*) Delete every Docker image
+docker rmi -f $(docker images -q)
 
 ======================
+1) git clone https://github.com/RayNovarina/rails5box-docker-heroku.git
+   cd rails5box-docker-heroku
 
+2) Build the project
+
+With those files in place, you can now generate the Rails skeleton app using
+docker-compose run:
+
+   $ docker-compose run web rails new . --force --database=postgresql --skip-bundle
+
+First, Compose will build the image for the web service using the Dockerfile.
+Then it’ll run rails new inside a new container, using that image.
+Once it’s done, you should have generated a fresh Rails app:
+  ../my_dockerized_app $
+  $ ls -l
+
+
+#==============================================
+2) docker-compose build shell
+
+3) docker-compose build web
+  Building web
+  Step 1/20 : FROM ruby:2.4.0-slim
+    ---> 5b64e5a703dd
+  Step 2/20 : MAINTAINER Ray Novarina <RNova94037@gmail.com>
+    ---> Using cache
+    ---> 3a2d23a433c9
+  Step 3/20 : ENV DEBIAN_FRONTEND noninteractive
+    ---> Using cache
+    ---> 20c89f08bb6d
+  Step 4/20 : RUN apt-get update &&   apt-get install -y apt-utils &&
+                  apt-get upgrade -y &&
+                  apt-get install -y build-essential nodejs libpq-dev postgresql-client
+                                     libsqlite3-dev &&
+                  apt-get install -y vim curl wget lsof
+    ---> Using cache
+    ---> 99b5cf1301b6
+  Step 5/20 : ENV DEBIAN_FRONTEND teletype
+    ---> Using cache
+    ---> 1341bf4485bd
+  Step 6/20 : ENV INSTALL_PATH /my_dockerized_app
+    ---> Using cache
+    ---> f0af3759c60d
+  Step 7/20 : ENV RAILS_ROOT /my_dockerized_app
+    ---> Using cache
+    ---> a537ad6fd16a
+  Step 8/20 : RUN mkdir -p $INSTALL_PATH
+    ---> Using cache
+    ---> ee0f543bd27c
+  Step 9/20 : WORKDIR $INSTALL_PATH
+    ---> Using cache
+    ---> 9d181ed4ed32
+  Step 10/20 : COPY Gemfile.forDockerBuild Gemfile
+    ---> Using cache
+    ---> f14c878603a9
+  Step 11/20 : COPY Gemfile.lock.forDockerBuild Gemfile.lock
+    ---> Using cache
+    ---> 06d56537e6bf
+  Step 12/20 : COPY Rakefile.forDockerBuild Rakefile
+    ---> Using cache
+    ---> 1c8f6eb52952
+  Step 13/20 : RUN gem install bundler
+    ---> Using cache
+    ---> 7d34ca0608a7
+  Step 14/20 : RUN bundle install --jobs 20 --retry 5
+    ---> Using cache
+    ---> 30ff52af43be
+  Step 15/20 : RUN mkdir -p $RAILS_ROOT/tmp/pids
+    ---> Using cache
+    ---> 01728330c29e
+  Step 16/20 : ADD . /my_dockerized_app
+    ---> Using cache
+    ---> 2d5eb1f66d7a
+  Step 17/20 : COPY . .
+    ---> Using cache
+    ---> 8090331a9e0b
+  Step 18/20 : EXPOSE 3000
+    ---> Using cache
+    ---> 91dd262891fe
+  Step 19/20 : ENTRYPOINT bundle exec
+    ---> Using cache
+    ---> 4c751a366628
+  Step 20/20 : CMD bundle exec rails server -p 3000 -b 0.0.0.0
+    ---> Using cache
+    ---> 4b356b2a4bf1
+  Successfully built 4b356b2a4bf1
+
+4) docker images
+  REPOSITORY                    TAG                 IMAGE ID            CREATED             SIZE
+  rails5boxdockerheroku_web     latest              4b356b2a4bf1        10 minutes ago      588 MB
+  rails5boxdockerheroku_shell   latest              4b356b2a4bf1        10 minutes ago      588 MB
+  postgres                      latest              9910dc9f2ac0        4 days ago          267 MB
+  ruby                          2.4.0-slim          5b64e5a703dd        8 days ago          223 MB
+
+5) docker-compose up
+
+======================
 
 # Railsbox4-Make-Docker-Image: March 17, 2017
 

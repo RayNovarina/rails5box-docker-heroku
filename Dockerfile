@@ -1,4 +1,5 @@
-# Modified version of: https://nickjanetakis.com/blog/dockerize-a-rails-5-postgres-redis-sidekiq-action-cable-app-with-docker-compose
+# Modified version of: https://docs.docker.com/compose/rails/
+# and https://nickjanetakis.com/blog/dockerize-a-rails-5-postgres-redis-sidekiq-action-cable-app-with-docker-compose
 # and https://github.com/philou/planning-poker.git
 
 #-------------------------------------------------------------------------------
@@ -70,85 +71,24 @@ WORKDIR $INSTALL_PATH
 # By doing this, Docker will be smart enough to execute all
 # future commands from within this directory.
 
-#-------------------------------------------------------------------------------
-# Copy the Gemfile as well as the Gemfile.lock and install
-# the RubyGems. This is a separate step so the dependencies
-# will be cached unless changes to one of those two files
-# are made.
-
-# This is going to copy in the Gemfile and Gemfile.lock from our
-# work station at a path relative to the Dockerfile to the
-# my_dockerized_app/ path inside of the Docker image.
-#
-# It copies it to /my_dockerized_app because of the WORKDIR being set.
-#
-# We copy in our Gemfile before the main app because Docker is
-# smart enough to cache "layers" when you build a Docker image.
-#
-# You see, each command we have in the Dockerfile is going to be
-# ran and then saved as a separate layer. Docker is smart enough
-# to only re-build pieces that change, in order from top to bottom.
-#
-# This is an advanced concept but it means that we'll be able to
-# cache all of our gems so that if we make an application code
-# change, it won't re-run bundle install unless a gem changed.
-#
 # Use the Gemfiles as Docker cache markers. Always bundle before copying app src.
 # (the src likely changed and we don't want to invalidate Docker's cache too early)
 # http://ilikestuffblog.com/2014/01/06/how-to-skip-bundle-install-when-deploying-a-rails-app-to-docker/
-COPY Gemfile.forDockerBuild Gemfile
-COPY Gemfile.lock.forDockerBuild Gemfile.lock
-COPY Rakefile.forDockerBuild Rakefile
-
-# Prevent bundler warnings; ensure that the bundler version executed is >= that which created Gemfile.lock
-RUN gem install bundler
-
-# Finish establishing our Ruby environment
-RUN bundle install --jobs 20 --retry 5
-
-#-------------------------------------------------------------------------------
-# Create application home. App server will need the pids dir so just create everything in one shot
-RUN mkdir -p $RAILS_ROOT/tmp/pids
-
-ADD . /my_dockerized_app
-
-# This might look a bit alien but it's copying in everything from
-# the current directory relative to the Dockerfile, over to the
-# /my_dockerized_app folder inside of the Docker image.
-#
-# We can get away with using the . for the second argument because
-# this is how the unix command cp (copy) works. It stands for the
-# current directory.
-COPY . .
-
-#-------------------------------------------------------------------------------
-# Expose port 3000 to the Docker host, so we can access it
-# from the outside.
-# Note: will be ignored by Heroku upon deploy.
-EXPOSE 3000
-
-#-------------------------------------------------------------------------------
-# Configure an entry point, so we don't need to specify
-# "bundle exec" for each of our commands. You can now run commands without
-# specifying "bundle exec" on the console. If you need to, you can override the
-# entrypoint as well.
-#     docker run -it demo "rake test"
-#     docker run -it --entrypoint="" demo "ls -la"
-ENTRYPOINT ["bundle", "exec"]
-
-# This is the command that's going to be run by default if you run the
-# Docker container without any arguments. Use the "exec" form of CMD so our
-# script shuts down gracefully on SIGTERM (i.e. `docker stop`)
-
-# Tell the Rails dev server to bind to all interfaces by default.
-# In our case, it will start the default Rails server and port. (Puma: localhost:3000)
-CMD ["bundle", "exec", "rails", "server", "-p", "3000", "-b", "0.0.0.0"]
-
-# Define the script we want run once the container boots
-# Use the "exec" form of CMD so our script shuts down gracefully on SIGTERM (i.e. `docker stop`)
-# CMD [ "config/containers/app_cmd.sh" ]
+# Create a bootstrap Gemfile which just loads Rails. It’ll be overwritten in a
+# moment by 'rails new'.
+# You’ll need an empty Gemfile.lock in order to build our Dockerfile.
+ADD Gemfile.forDockerBuild /$INSTALL_PATH/Gemfile
+ADD Gemfile.lock.forDockerBuild /$INSTALL_PATH/Gemfile.lock
 
 
+RUN bundle install
+
+ADD . /$INSTALL_PATH
+
+# That’ll put your application code inside an image that will build a container
+# with Ruby, Bundler and all your dependencies inside it. 
+
+#===============================================================================
 #===============================================================================
 # Variant per: https://github.com/philou/planning-poker
 # FROM ruby:2.3.3
@@ -261,6 +201,84 @@ CMD ["bundle", "exec", "rails", "server", "-p", "3000", "-b", "0.0.0.0"]
 
 #-------------------------------------------------------------------------------
 # Variant per: https://nickjanetakis.com/blog/dockerize-a-rails-5-postgres-redis-sidekiq-action-cable-app-with-docker-compose
+#
+## Copy the Gemfile as well as the Gemfile.lock and install
+## the RubyGems. This is a separate step so the dependencies
+## will be cached unless changes to one of those two files
+## are made.
+#
+## This is going to copy in the Gemfile and Gemfile.lock from our
+## work station at a path relative to the Dockerfile to the
+## my_dockerized_app/ path inside of the Docker image.
+##
+## It copies it to /my_dockerized_app because of the WORKDIR being set.
+##
+## We copy in our Gemfile before the main app because Docker is
+## smart enough to cache "layers" when you build a Docker image.
+##
+## You see, each command we have in the Dockerfile is going to be
+## ran and then saved as a separate layer. Docker is smart enough
+## to only re-build pieces that change, in order from top to bottom.
+##
+## This is an advanced concept but it means that we'll be able to
+## cache all of our gems so that if we make an application code
+## change, it won't re-run bundle install unless a gem changed.
+##
+## Use the Gemfiles as Docker cache markers. Always bundle before copying app src.
+## (the src likely changed and we don't want to invalidate Docker's cache too early)
+## http://ilikestuffblog.com/2014/01/06/how-to-skip-bundle-install-when-deploying-a-rails-app-to-docker/
+#COPY Gemfile.forDockerBuild Gemfile
+#COPY Gemfile.lock.forDockerBuild Gemfile.lock
+#COPY Rakefile.forDockerBuild Rakefile
+#
+## Prevent bundler warnings; ensure that the bundler version executed is >= that which created Gemfile.lock
+#RUN gem install bundler
+#
+## Finish establishing our Ruby environment
+#RUN bundle install --jobs 20 --retry 5
+#
+##-------------------------------------------------------------------------------
+## Create application home. App server will need the pids dir so just create everything in one shot
+#RUN mkdir -p $RAILS_ROOT/tmp/pids
+#
+#ADD . /my_dockerized_app
+#
+## This might look a bit alien but it's copying in everything from
+## the current directory relative to the Dockerfile, over to the
+# /my_dockerized_app folder inside of the Docker image.
+#
+# We can get away with using the . for the second argument because
+# this is how the unix command cp (copy) works. It stands for the
+# current directory.
+#COPY . .
+#
+##-------------------------------------------------------------------------------
+## Expose port 3000 to the Docker host, so we can access it
+## from the outside.
+## Note: will be ignored by Heroku upon deploy.
+#EXPOSE 3000
+#
+##-------------------------------------------------------------------------------
+## Configure an entry point, so we don't need to specify
+## "bundle exec" for each of our commands. You can now run commands without
+## specifying "bundle exec" on the console. If you need to, you can override the
+## entrypoint as well.
+##     docker run -it demo "rake test"
+##     docker run -it --entrypoint="" demo "ls -la"
+#ENTRYPOINT ["bundle", "exec"]
+#
+## This is the command that's going to be run by default if you run the
+## Docker container without any arguments. Use the "exec" form of CMD so our
+## script shuts down gracefully on SIGTERM (i.e. `docker stop`)
+#
+## Tell the Rails dev server to bind to all interfaces by default.
+## In our case, it will start the default Rails server and port. (Puma: localhost:3000)
+#CMD ["bundle", "exec", "rails", "server", "-p", "3000", "-b", "0.0.0.0"]
+#
+## Define the script we want run once the container boots
+## Use the "exec" form of CMD so our script shuts down gracefully on SIGTERM (i.e. `docker stop`)
+## CMD [ "config/containers/app_cmd.sh" ]
+##
 ## Provide a dummy DATABASE_URL and more to Rails so it can pre-compile
 ## assets. The values do not need to be real, just valid syntax.
 ##
@@ -270,7 +288,7 @@ CMD ["bundle", "exec", "rails", "server", "-p", "3000", "-b", "0.0.0.0"]
 #RUN bundle exec rake RAILS_ENV=production DATABASE_URL=postgresql://user:pass@127.0.0.1/dbname ACTION_CABLE_ALLOWED_REQUEST_ORIGINS=foo,bar SECRET_TOKEN=dummytoken assets:precompile
 #
 ## In production you will very likely reverse proxy Rails with nginx.
-## This sets up a volume so that nginx can read in the assets from
-## the Rails Docker image without having to copy them to the Docker host.
-#VOLUME ["$INSTALL_PATH/public"]
-#VOLUME ["$INSTALL_PATH/"]
+### This sets up a volume so that nginx can read in the assets from
+### the Rails Docker image without having to copy them to the Docker host.
+##VOLUME ["$INSTALL_PATH/public"]
+##VOLUME ["$INSTALL_PATH/"]
